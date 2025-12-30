@@ -1,0 +1,68 @@
+import streamlit as st
+
+# --- CONFIG & STYLING ---
+st.set_page_config(page_title="Stats Football", page_icon="⚽", layout="centered")
+
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; color: white; }
+    div.stButton > button { width: 100%; background-color: #28a745; color: white; height: 3em; font-size: 20px;}
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- DATA: LEAGUES & SHORTLISTS ---
+LEAGUES = {
+    "Netherlands Eredivisie": 1.2, "Norway Eliteserien": 1.2, 
+    "Israel Premier League": 1.1, "German Bundesliga": 1.0,
+    "Swiss Super League": 1.0, "Iceland Urvalsdeild": 1.0,
+    "Australia A-League": 0.9, "English Premier League": 0.8, "Other": 0.0
+}
+
+SHORTLIST = ["Bayer Leverkusen", "PSV Eindhoven", "Man City", "Barcelona", "Maccabi Tel Aviv", "Liverpool", "Bodo/Glimt", "Dortmund"]
+
+# --- APP UI ---
+st.title("⚽ Stats Football")
+st.subheader("2H Prediction Engine")
+
+with st.expander("📝 Manual Match Input", expanded=True):
+    league = st.selectbox("Select League", list(LEAGUES.keys()))
+    col1, col2 = st.columns(2)
+    with col1:
+        h_team = st.text_input("Home Team")
+        h_xg = st.number_input("Home 1H xG", min_value=0.0, step=0.1)
+        h_sot = st.number_input("Home Shots on Target", min_value=0)
+    with col2:
+        a_team = st.text_input("Away Team")
+        a_xg = st.number_input("Away 1H xG", min_value=0.0, step=0.1)
+        a_sot = st.number_input("Away Shots on Target", min_value=0)
+    
+    score = st.selectbox("Halftime Score", ["0-0", "1-0", "0-1", "1-1", "Other"])
+
+# --- CALCULATE LOGIC ---
+if st.button("RUN AI PREDICTION"):
+    # 1. Base Score from Urgency
+    urgency_map = {"0-0": 2.5, "1-0": 2.0, "0-1": 2.0, "1-1": 1.5, "Other": 1.0}
+    base = urgency_map.get(score, 1.0)
+    
+    # 2. xG & Volume Boost
+    total_goals = 1 if score in ["1-0", "0-1"] else (2 if score=="1-1" else 0)
+    pressure = max(0, (h_xg + a_xg) - total_goals) * 1.5
+    volume = (h_sot + a_sot) * 0.4
+    
+    # 3. League & Shortlist Modifiers
+    l_boost = LEAGUES.get(league, 0.0)
+    s_boost = 1.5 if (h_team in SHORTLIST or a_team in SHORTLIST) else 0.0
+    
+    final_score = round(min(10.0, base + pressure + volume + l_boost + s_boost), 1)
+
+    # --- DISPLAY RESULTS ---
+    st.divider()
+    if final_score >= 8.0:
+        st.success(f"🔥 AI SCORE: {final_score}/10")
+        st.markdown("**VERDICT: HIGH PROBABILITY.** Strong pressure and favorable league/team patterns.")
+    elif final_score >= 6.0:
+        st.warning(f"⚠️ AI SCORE: {final_score}/10")
+        st.markdown("**VERDICT: WATCHLIST.** Moderate pressure. Wait for 60' for better odds.")
+    else:
+        st.error(f"❌ AI SCORE: {final_score}/10")
+        st.markdown("**VERDICT: NO PLAY.** Statistics do not support a 2H goal.")
